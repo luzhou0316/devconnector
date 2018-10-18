@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const gravatar = require('gravatar');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const keys = require('../../config/keys');
+const passport = require('passport');
 
 const User = require('../../models/User');
 
@@ -10,9 +13,9 @@ const User = require('../../models/User');
 // @access Public
 router.get('/test', (req, res) => res.json({ msg: "Users Works" }));
 
-// @route Post api/users/test
-// @desc Test users route
-// @access Public
+// @route   Post api/users/test
+// @desc    User register
+// @access  Public
 router.post('/register', (req, res) => {
     User.findOne({ email: req.body.email })
         .then(user => {
@@ -45,9 +48,9 @@ router.post('/register', (req, res) => {
         });
 });
 
-// @route Post api/users/login
-// @desc Test users route
-// @access Public
+// @route   Post api/users/login
+// @desc    User Login
+// @access  Public
 router.post('/login', (req, res) => {
     const email = req.body.email;
     const password = req.body.password;
@@ -62,11 +65,39 @@ router.post('/login', (req, res) => {
         // Check Password
         bcrypt.compare(password, user.password).then(isMatch => {
             if (isMatch) {
-                res.json({ msg: 'Success' });
+                // User matched
+                const payload = { id: user.id, name: user.name, avatar: user.avatar };
+
+                //Sign Token
+                jwt.sign(
+                    payload,
+                    keys.secreOrKey, { expiresIn: 3600 },
+                    (err, token) => {
+                        res.json({
+                            success: true,
+                            token: 'Bearer ' + token
+                        })
+                    });
             } else {
                 return res.status(400).json({ password: 'Password incorrect' })
             }
         });
     });
 });
+
+// @route   Get api/users/current
+// @desc    Return current user
+// @access  Private
+router.get(
+    '/current',
+    passport.authenticate('jwt', { session: false }),
+    (req, res) => {
+        res.json({
+            id: req.user.id,
+            name: req.user.name,
+            email: req.user.email
+        });
+    }
+);
+
 module.exports = router;
